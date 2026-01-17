@@ -2,23 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import { PostCard } from '@/components/PostCard'
+import { AuthGuard } from '@/components/AuthGuard'
+import { useAuthFetch } from '@/hooks/useAuthFetch'
 import { Loader2, AlertCircle, FileX } from 'lucide-react'
 import type { BlogPost } from '@/lib/firestore'
 
 type StatusFilter = 'all' | 'draft' | 'published'
 
-export default function HomePage() {
+function PostList() {
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { authFetch } = useAuthFetch()
 
   useEffect(() => {
     async function fetchPosts() {
       setLoading(true)
+      setError(null)
       try {
         const url = filter === 'all' ? '/api/posts' : `/api/posts?status=${filter}`
-        const res = await fetch(url)
+        const res = await authFetch(url)
         const data = await res.json()
 
         if (data.success) {
@@ -34,7 +38,7 @@ export default function HomePage() {
     }
 
     fetchPosts()
-  }, [filter])
+  }, [filter, authFetch])
 
   return (
     <div>
@@ -84,5 +88,13 @@ export default function HomePage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <AuthGuard>
+      <PostList />
+    </AuthGuard>
   )
 }

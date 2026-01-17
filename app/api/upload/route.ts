@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { v4 as uuidv4 } from 'uuid'
+import { getAuthFromRequest } from '@/lib/auth-admin'
 
 const SUPPORTED_FORMATS = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml']
 
@@ -25,6 +26,15 @@ function getExtension(mimeType: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // 인증 확인
+    const auth = await getAuthFromRequest(request)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: '인증이 필요합니다' },
+        { status: 401 }
+      )
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 

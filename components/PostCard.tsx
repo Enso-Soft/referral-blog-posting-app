@@ -9,6 +9,9 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
+  // content에서 첫 번째 이미지 추출
+  const thumbnail = post.content?.match(/<img[^>]+src=["']([^"']+)["']/)?.[1]
+
   const formatDate = (timestamp: any) => {
     if (!timestamp) return ''
     // Firestore Timestamp 형식 처리 (_seconds 또는 toDate)
@@ -34,10 +37,10 @@ export function PostCard({ post }: PostCardProps) {
     <Link href={`/posts/${post.id}`}>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
         {/* Thumbnail */}
-        {post.thumbnail && (
+        {thumbnail && (
           <div className="aspect-video bg-gray-100 relative">
             <img
-              src={post.thumbnail}
+              src={thumbnail}
               alt={post.title}
               className="w-full h-full object-cover"
             />
@@ -71,9 +74,9 @@ export function PostCard({ post }: PostCardProps) {
             {post.title}
           </h3>
 
-          {/* Excerpt */}
+          {/* Content Preview */}
           <p className="text-sm text-gray-500 line-clamp-2 mb-3">
-            {post.excerpt}
+            {post.content.replace(/<[^>]*>/g, '').slice(0, 100)}
           </p>
 
           {/* Meta */}

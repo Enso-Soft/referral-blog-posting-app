@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { AuthProvider } from '@/components/AuthProvider'
+import { Header } from '@/components/Header'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -17,18 +19,14 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50">
-          <header className="bg-white border-b border-gray-200">
-            <div className="max-w-7xl mx-auto px-4 py-4">
-              <a href="/" className="text-xl font-bold text-gray-900">
-                Blog Editor
-              </a>
-            </div>
-          </header>
-          <main className="max-w-7xl mx-auto px-4 py-6">
-            {children}
-          </main>
-        </div>
+        <AuthProvider>
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main className="max-w-7xl mx-auto px-4 py-6">
+              {children}
+            </main>
+          </div>
+        </AuthProvider>
       </body>
     </html>
   )
