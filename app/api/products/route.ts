@@ -236,28 +236,21 @@ export async function GET(request: NextRequest) {
     let categoryStats: { name: string; count: number }[] | undefined
 
     if (page === 1 && !category && !search && !minPriceNum && !maxPriceNum) {
-      const categoriesSnapshot = await db
-        .collection('naver')
-        .doc('_meta')
-        .collection('categories')
+      const allUserProductsSnapshot = await productsRef
+        .where('userId', '==', auth.userId)
+        .select('category.level1')
         .get()
 
-      const categoryCountPromises = categoriesSnapshot.docs.map(async (catDoc) => {
-        const categoryName = catDoc.data().name
-        const countSnapshot = await productsRef
-          .where('userId', '==', auth.userId)
-          .where('category.level1', '==', categoryName)
-          .count()
-          .get()
-        return {
-          name: categoryName,
-          count: countSnapshot.data().count,
+      const categoryCounts: Record<string, number> = {}
+      allUserProductsSnapshot.docs.forEach((doc) => {
+        const cat = doc.data()?.category?.level1
+        if (cat) {
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1
         }
       })
 
-      const allCategoryCounts = await Promise.all(categoryCountPromises)
-
-      categoryStats = allCategoryCounts
+      categoryStats = Object.entries(categoryCounts)
+        .map(([name, count]) => ({ name, count }))
         .filter((c) => c.count > 0)
         .sort((a, b) => b.count - a.count)
     }
@@ -265,8 +258,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       products,
-      // 커서 기반용
-      hasMore: lastId ? products.length === perPage : undefined,
+      // 커서 기반용 (첫 로드 시에도 hasMore 계산)
+      hasMore: lastId 
+        ? products.length === perPage 
+        : (pagination?.hasNextPage ?? products.length === perPage),
       // 페이지 기반용
       pagination,
       total: totalCount,

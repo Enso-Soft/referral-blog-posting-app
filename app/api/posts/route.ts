@@ -17,9 +17,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const lastId = searchParams.get('lastId')
 
     const db = getDb()
-    let query: FirebaseFirestore.Query = db.collection('blog_posts')
+    const postsRef = db.collection('blog_posts')
+    let query: FirebaseFirestore.Query = postsRef
 
     // Admin이 아니면 본인 포스트만 조회
     if (!auth.isAdmin) {
@@ -33,13 +36,29 @@ export async function GET(request: NextRequest) {
 
     query = query.orderBy('createdAt', 'desc')
 
+    // 전체 개수 조회
+    const countSnapshot = await query.count().get()
+    const total = countSnapshot.data().count
+
+    // 커서 기반 페이지네이션
+    if (lastId) {
+      const lastDoc = await postsRef.doc(lastId).get()
+      if (lastDoc.exists) {
+        query = query.startAfter(lastDoc)
+      }
+    }
+
+    query = query.limit(limit)
+
     const snapshot = await query.get()
     const posts = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }))
 
-    return NextResponse.json({ success: true, posts })
+    const hasMore = posts.length === limit
+
+    return NextResponse.json({ success: true, posts, total, hasMore })
   } catch (error) {
     console.error('GET posts error:', error)
     const errorMessage = error instanceof Error ? error.message : String(error)
