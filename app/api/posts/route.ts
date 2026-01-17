@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, posts })
   } catch (error) {
     console.error('GET posts error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { success: false, error: '포스트 목록 조회에 실패했습니다' },
+      { success: false, error: '포스트 목록 조회에 실패했습니다', details: errorMessage },
       { status: 500 }
     )
   }

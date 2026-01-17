@@ -24,7 +24,7 @@ export default function HomePage() {
         if (data.success) {
           setPosts(data.posts)
         } else {
-          setError(data.error || '포스트를 불러올 수 없습니다')
+          setError(data.details ? `${data.error}: ${data.details}` : data.error || '포스트를 불러올 수 없습니다')
         }
       } catch (err) {
         setError('포스트를 불러오는 중 오류가 발생했습니다')
