@@ -6,6 +6,13 @@ frontend:
         - npm ci
     build:
       commands:
+        - echo "FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID" >> .env.production
+        - echo "FIREBASE_CLIENT_EMAIL=$FIREBASE_CLIENT_EMAIL" >> .env.production
+        - echo "FIREBASE_PRIVATE_KEY=\"$FIREBASE_PRIVATE_KEY\"" >> .env.production
+        - echo "S3_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID" >> .env.production
+        - echo "S3_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY" >> .env.production
+        - echo "S3_REGION=$S3_REGION" >> .env.production
+        - echo "S3_BUCKET=$S3_BUCKET" >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
