@@ -1,0 +1,514 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { Timestamp } from 'firebase-admin/firestore'
+import { getDb } from '@/lib/firebase-admin'
+import { getAuthFromRequestOrApiKey, getAuthFromApiKey } from '@/lib/auth-admin'
+
+// 제품 데이터 타입
+interface ProductData {
+  id?: string
+  name: string
+  price?: number
+  images?: string[]
+  affiliateLink: string
+  category1?: string
+  category2?: string
+  category3?: string
+  brand?: string
+  [key: string]: unknown
+}
+
+// nameKeywords 생성 (검색용)
+function generateNameKeywords(name: string): string[] {
+  const words = name.toLowerCase().split(/\s+/)
+  const keywords: Set<string> = new Set()
+
+  words.forEach(word => {
+    // 각 단어의 부분 문자열 추가 (1~전체 길이)
+    for (let i = 1; i <= word.length; i++) {
+      keywords.add(word.substring(0, i))
+    }
+  })
+
+  return Array.from(keywords)
+}
+
+// GET: 제품 목록/단일 제품 조회 (API Key 또는 Bearer Token)
+export async function GET(request: NextRequest) {
+  try {
+    // 통합 인증 (API Key 또는 Bearer Token)
+    const auth = await getAuthFromRequestOrApiKey(request)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: '인증이 필요합니다' },
+        { status: 401 }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    const productId = searchParams.get('id')
+    const category = searchParams.get('category')
+    const search = searchParams.get('search') || searchParams.get('keyword')
+    const perPage = parseInt(searchParams.get('limit') || searchParams.get('perPage') || '20')
+    const page = parseInt(searchParams.get('page') || '1')
+    const lastId = searchParams.get('lastId')
+
+    // 가격 범위 필터
+    const minPrice = searchParams.get('minPrice') || searchParams.get('min-price')
+    const maxPrice = searchParams.get('maxPrice') || searchParams.get('max-price')
+    const minPriceNum = minPrice ? parseInt(minPrice) : null
+    const maxPriceNum = maxPrice ? parseInt(maxPrice) : null
+
+    const db = getDb()
+    const productsRef = db.collection('products')
+
+    // 단일 제품 조회
+    if (productId) {
+      const docId = `${auth.userId}_${productId}`
+      const docSnap = await productsRef.doc(docId).get()
+
+      if (!docSnap.exists) {
+        // productId로 직접 조회 시도
+        const directSnap = await productsRef.doc(productId).get()
+        if (directSnap.exists) {
+          const data = directSnap.data()
+          if (data?.userId === auth.userId) {
+            return NextResponse.json({
+              success: true,
+              product: { id: directSnap.id, ...data }
+            })
+          }
+        }
+        return NextResponse.json(
+          { success: false, error: '제품을 찾을 수 없습니다' },
+          { status: 404 }
+        )
+      }
+
+      const data = docSnap.data()
+      if (data?.userId !== auth.userId) {
+        return NextResponse.json(
+          { success: false, error: '접근 권한이 없습니다' },
+          { status: 403 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        product: { id: docSnap.id, ...data }
+      })
+    }
+
+    // 목록 조회
+    const userProductsQuery = productsRef.where('userId', '==', auth.userId)
+    let products: { id: string; [key: string]: unknown }[] = []
+    let isSearchResult = false
+    let totalCount: number | undefined
+    let pagination: {
+      currentPage: number
+      totalPages: number
+      perPage: number
+      totalCount: number
+      hasNextPage: boolean
+      hasPrevPage: boolean
+    } | undefined
+
+    // 검색 필터 (nameKeywords + brand 병렬 검색)
+    if (search) {
+      isSearchResult = true
+      const searchTerm = search.toLowerCase().trim()
+      const searchLimit = 200 // 검색 결과 후 필터링을 위해 넉넉하게
+
+      const [keywordSnapshot, brandSnapshot] = await Promise.all([
+        productsRef
+          .where('userId', '==', auth.userId)
+          .where('nameKeywords', 'array-contains', searchTerm)
+          .limit(searchLimit)
+          .get(),
+        productsRef
+          .where('userId', '==', auth.userId)
+          .where('brand', '==', search.trim())
+          .limit(searchLimit)
+          .get(),
+      ])
+
+      const productMap = new Map<string, { id: string; [key: string]: unknown }>()
+
+      keywordSnapshot.docs.forEach((doc) => {
+        productMap.set(doc.id, { id: doc.id, ...doc.data() })
+      })
+
+      brandSnapshot.docs.forEach((doc) => {
+        if (!productMap.has(doc.id)) {
+          productMap.set(doc.id, { id: doc.id, ...doc.data() })
+        }
+      })
+
+      let allProducts = Array.from(productMap.values())
+
+      // 가격 범위 필터 적용
+      if (minPriceNum !== null || maxPriceNum !== null) {
+        allProducts = allProducts.filter(p => {
+          const price = (p.price as number) || 0
+          if (minPriceNum !== null && price < minPriceNum) return false
+          if (maxPriceNum !== null && price > maxPriceNum) return false
+          return true
+        })
+      }
+
+      // 페이지네이션 적용
+      totalCount = allProducts.length
+      const totalPages = Math.ceil(totalCount / perPage)
+      const startIndex = (page - 1) * perPage
+      products = allProducts.slice(startIndex, startIndex + perPage)
+
+      pagination = {
+        currentPage: page,
+        totalPages,
+        perPage,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    }
+    // 카테고리 필터 또는 전체 조회
+    else {
+      // 기본 쿼리 구성
+      let baseQuery: FirebaseFirestore.Query = productsRef.where('userId', '==', auth.userId)
+
+      if (category) {
+        baseQuery = baseQuery.where('category.level1', '==', category)
+      }
+
+      // 가격 범위 필터 (Firestore 쿼리)
+      if (minPriceNum !== null) {
+        baseQuery = baseQuery.where('price', '>=', minPriceNum)
+      }
+      if (maxPriceNum !== null) {
+        baseQuery = baseQuery.where('price', '<=', maxPriceNum)
+      }
+
+      // 전체 개수 조회
+      const countSnapshot = await baseQuery.count().get()
+      totalCount = countSnapshot.data().count
+      const totalPages = Math.ceil(totalCount / perPage)
+
+      // 페이지 기반 vs 커서 기반 페이지네이션
+      if (lastId) {
+        // 커서 기반 페이지네이션 (기존 방식)
+        let query = baseQuery
+        if (!minPriceNum && !maxPriceNum) {
+          query = query.orderBy('assignedAt', 'desc')
+        }
+        query = query.limit(perPage)
+
+        const lastDoc = await productsRef.doc(lastId).get()
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc)
+        }
+
+        const snapshot = await query.get()
+        products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      } else {
+        // 페이지 기반 페이지네이션
+        let query = baseQuery
+        if (!minPriceNum && !maxPriceNum) {
+          query = query.orderBy('assignedAt', 'desc')
+        }
+
+        const offset = (page - 1) * perPage
+        query = query.offset(offset).limit(perPage)
+
+        const snapshot = await query.get()
+        products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+        pagination = {
+          currentPage: page,
+          totalPages,
+          perPage,
+          totalCount,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        }
+      }
+    }
+
+    // 카테고리 통계 (첫 페이지 + 전체 카테고리 + 필터 없을 때만)
+    let categoryStats: { name: string; count: number }[] | undefined
+
+    if (page === 1 && !category && !search && !minPriceNum && !maxPriceNum) {
+      const categoriesSnapshot = await db
+        .collection('naver')
+        .doc('_meta')
+        .collection('categories')
+        .get()
+
+      const categoryCountPromises = categoriesSnapshot.docs.map(async (catDoc) => {
+        const categoryName = catDoc.data().name
+        const countSnapshot = await productsRef
+          .where('userId', '==', auth.userId)
+          .where('category.level1', '==', categoryName)
+          .count()
+          .get()
+        return {
+          name: categoryName,
+          count: countSnapshot.data().count,
+        }
+      })
+
+      const allCategoryCounts = await Promise.all(categoryCountPromises)
+
+      categoryStats = allCategoryCounts
+        .filter((c) => c.count > 0)
+        .sort((a, b) => b.count - a.count)
+    }
+
+    return NextResponse.json({
+      success: true,
+      products,
+      // 커서 기반용
+      hasMore: lastId ? products.length === perPage : undefined,
+      // 페이지 기반용
+      pagination,
+      total: totalCount,
+      categoryStats,
+    })
+  } catch (error) {
+    console.error('GET products error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      { success: false, error: '제품 목록 조회에 실패했습니다', details: errorMessage },
+      { status: 500 }
+    )
+  }
+}
+
+// POST: 제품 추가 (API Key만 지원)
+export async function POST(request: NextRequest) {
+  try {
+    // API Key 인증만 허용
+    const auth = await getAuthFromApiKey(request)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'API 키 인증이 필요합니다. X-API-Key 헤더를 확인하세요.' },
+        { status: 401 }
+      )
+    }
+
+    const body: ProductData = await request.json()
+
+    // 필수 필드 검증
+    if (!body.name) {
+      return NextResponse.json(
+        { success: false, error: 'name 필드는 필수입니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (!body.affiliateLink) {
+      return NextResponse.json(
+        { success: false, error: 'affiliateLink 필드는 필수입니다.' },
+        { status: 400 }
+      )
+    }
+
+    const db = getDb()
+    const now = Timestamp.now()
+
+    // 고유 제품 ID 생성
+    const productId = body.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    const docId = `${auth.userId}_${productId}`
+
+    // 제품 데이터 구성
+    const productData = {
+      userId: auth.userId,
+      productId,
+      name: body.name,
+      price: body.price || 0,
+      images: body.images || [],
+      affiliateLink: body.affiliateLink,
+      category: {
+        level1: body.category1 || '',
+        level2: body.category2 || '',
+        level3: body.category3 || '',
+      },
+      brand: body.brand || '',
+      nameKeywords: generateNameKeywords(body.name),
+      assignedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      source: 'api',
+    }
+
+    await db.collection('products').doc(docId).set(productData)
+
+    return NextResponse.json({
+      success: true,
+      product: { id: docId, ...productData },
+      message: '제품이 등록되었습니다.',
+    })
+  } catch (error) {
+    console.error('POST products error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      { success: false, error: '제품 등록에 실패했습니다', details: errorMessage },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH: 제품 수정 (API Key만 지원)
+export async function PATCH(request: NextRequest) {
+  try {
+    // API Key 인증만 허용
+    const auth = await getAuthFromApiKey(request)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'API 키 인증이 필요합니다. X-API-Key 헤더를 확인하세요.' },
+        { status: 401 }
+      )
+    }
+
+    const body: Partial<ProductData> & { id: string } = await request.json()
+
+    // ID 필드 검증
+    if (!body.id) {
+      return NextResponse.json(
+        { success: false, error: 'id 필드는 필수입니다.' },
+        { status: 400 }
+      )
+    }
+
+    const db = getDb()
+    const productsRef = db.collection('products')
+
+    // 문서 ID 결정 (userId_productId 형태 또는 직접 ID)
+    let docId = body.id
+    let docSnap = await productsRef.doc(docId).get()
+
+    // 찾을 수 없으면 userId_productId 형태로 시도
+    if (!docSnap.exists) {
+      docId = `${auth.userId}_${body.id}`
+      docSnap = await productsRef.doc(docId).get()
+    }
+
+    if (!docSnap.exists) {
+      return NextResponse.json(
+        { success: false, error: '제품을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
+    const existingData = docSnap.data()
+    if (existingData?.userId !== auth.userId) {
+      return NextResponse.json(
+        { success: false, error: '접근 권한이 없습니다' },
+        { status: 403 }
+      )
+    }
+
+    // 업데이트할 데이터 구성
+    const updateData: Record<string, unknown> = {
+      updatedAt: Timestamp.now(),
+    }
+
+    if (body.name !== undefined) {
+      updateData.name = body.name
+      updateData.nameKeywords = generateNameKeywords(body.name)
+    }
+    if (body.price !== undefined) updateData.price = body.price
+    if (body.images !== undefined) updateData.images = body.images
+    if (body.affiliateLink !== undefined) updateData.affiliateLink = body.affiliateLink
+    if (body.brand !== undefined) updateData.brand = body.brand
+    if (body.category1 !== undefined || body.category2 !== undefined || body.category3 !== undefined) {
+      updateData.category = {
+        level1: body.category1 ?? existingData?.category?.level1 ?? '',
+        level2: body.category2 ?? existingData?.category?.level2 ?? '',
+        level3: body.category3 ?? existingData?.category?.level3 ?? '',
+      }
+    }
+
+    await productsRef.doc(docId).update(updateData)
+
+    // 업데이트된 문서 반환
+    const updatedDoc = await productsRef.doc(docId).get()
+
+    return NextResponse.json({
+      success: true,
+      product: { id: docId, ...updatedDoc.data() },
+      message: '제품이 수정되었습니다.',
+    })
+  } catch (error) {
+    console.error('PATCH products error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      { success: false, error: '제품 수정에 실패했습니다', details: errorMessage },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE: 제품 삭제 (API Key만 지원)
+export async function DELETE(request: NextRequest) {
+  try {
+    // API Key 인증만 허용
+    const auth = await getAuthFromApiKey(request)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'API 키 인증이 필요합니다. X-API-Key 헤더를 확인하세요.' },
+        { status: 401 }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    const productId = searchParams.get('id')
+
+    if (!productId) {
+      return NextResponse.json(
+        { success: false, error: 'id 파라미터는 필수입니다.' },
+        { status: 400 }
+      )
+    }
+
+    const db = getDb()
+    const productsRef = db.collection('products')
+
+    // 문서 ID 결정 (userId_productId 형태 또는 직접 ID)
+    let docId = productId
+    let docSnap = await productsRef.doc(docId).get()
+
+    // 찾을 수 없으면 userId_productId 형태로 시도
+    if (!docSnap.exists) {
+      docId = `${auth.userId}_${productId}`
+      docSnap = await productsRef.doc(docId).get()
+    }
+
+    if (!docSnap.exists) {
+      return NextResponse.json(
+        { success: false, error: '제품을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
+    const existingData = docSnap.data()
+    if (existingData?.userId !== auth.userId) {
+      return NextResponse.json(
+        { success: false, error: '접근 권한이 없습니다' },
+        { status: 403 }
+      )
+    }
+
+    await productsRef.doc(docId).delete()
+
+    return NextResponse.json({
+      success: true,
+      message: '제품이 삭제되었습니다.',
+    })
+  } catch (error) {
+    console.error('DELETE products error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      { success: false, error: '제품 삭제에 실패했습니다', details: errorMessage },
+      { status: 500 }
+    )
+  }
+}

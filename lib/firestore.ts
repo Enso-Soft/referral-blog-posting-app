@@ -14,15 +14,21 @@ import {
   type DocumentData,
   type QueryConstraint,
 } from 'firebase/firestore'
-import { db } from './firebase'
+import { getFirebaseDb } from './firebase'
+
+export interface Product {
+  name: string
+  affiliateLink: string
+}
 
 export interface BlogPost {
   id?: string
+  userId: string           // 작성자 UID
+  userEmail?: string       // 작성자 이메일 (표시용)
   title: string
   content: string
-  excerpt: string
-  thumbnail: string
   keywords: string[]
+  products?: Product[]     // 제품 목록
   status: 'draft' | 'published'
   platform: 'tistory' | 'naver' | 'both'
   createdAt: Timestamp
@@ -43,7 +49,7 @@ export async function getPosts(status?: 'draft' | 'published'): Promise<BlogPost
     constraints.unshift(where('status', '==', status))
   }
 
-  const q = query(collection(db, COLLECTION_NAME), ...constraints)
+  const q = query(collection(getFirebaseDb(), COLLECTION_NAME), ...constraints)
   const snapshot = await getDocs(q)
 
   return snapshot.docs.map((doc) => ({
@@ -54,7 +60,7 @@ export async function getPosts(status?: 'draft' | 'published'): Promise<BlogPost
 
 // Get single post
 export async function getPost(id: string): Promise<BlogPost | null> {
-  const docRef = doc(db, COLLECTION_NAME, id)
+  const docRef = doc(getFirebaseDb(), COLLECTION_NAME, id)
   const snapshot = await getDoc(docRef)
 
   if (!snapshot.exists()) {
@@ -70,7 +76,7 @@ export async function getPost(id: string): Promise<BlogPost | null> {
 // Create post
 export async function createPost(post: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   const now = Timestamp.now()
-  const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+  const docRef = await addDoc(collection(getFirebaseDb(), COLLECTION_NAME), {
     ...post,
     createdAt: now,
     updatedAt: now,
@@ -80,7 +86,7 @@ export async function createPost(post: Omit<BlogPost, 'id' | 'createdAt' | 'upda
 
 // Update post
 export async function updatePost(id: string, data: Partial<BlogPost>): Promise<void> {
-  const docRef = doc(db, COLLECTION_NAME, id)
+  const docRef = doc(getFirebaseDb(), COLLECTION_NAME, id)
   await updateDoc(docRef, {
     ...data,
     updatedAt: Timestamp.now(),
@@ -89,7 +95,7 @@ export async function updatePost(id: string, data: Partial<BlogPost>): Promise<v
 
 // Delete post
 export async function deletePost(id: string): Promise<void> {
-  const docRef = doc(db, COLLECTION_NAME, id)
+  const docRef = doc(getFirebaseDb(), COLLECTION_NAME, id)
   await deleteDoc(docRef)
 }
 
@@ -104,7 +110,7 @@ export function subscribeToPosts(
     constraints.unshift(where('status', '==', status))
   }
 
-  const q = query(collection(db, COLLECTION_NAME), ...constraints)
+  const q = query(collection(getFirebaseDb(), COLLECTION_NAME), ...constraints)
 
   return onSnapshot(q, (snapshot) => {
     const posts = snapshot.docs.map((doc) => ({
@@ -120,7 +126,7 @@ export function subscribeToPost(
   id: string,
   callback: (post: BlogPost | null) => void
 ): () => void {
-  const docRef = doc(db, COLLECTION_NAME, id)
+  const docRef = doc(getFirebaseDb(), COLLECTION_NAME, id)
 
   return onSnapshot(docRef, (snapshot) => {
     if (!snapshot.exists()) {

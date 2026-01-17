@@ -3,6 +3,8 @@
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { PostEditor } from '@/components/PostEditor'
+import { AuthGuard } from '@/components/AuthGuard'
+import { useAuthFetch } from '@/hooks/useAuthFetch'
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -22,19 +24,20 @@ function countWords(html: string): number {
   return text.length
 }
 
-export default function PostEditPage() {
+function PostEditContent() {
   const params = useParams()
   const postId = params.id as string
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const { authFetch } = useAuthFetch()
 
   // 포스트 불러오기
   useEffect(() => {
     async function fetchPost() {
       try {
-        const res = await fetch(`/api/posts/${postId}`)
+        const res = await authFetch(`/api/posts/${postId}`)
         const data = await res.json()
 
         if (data.success) {
@@ -50,14 +53,14 @@ export default function PostEditPage() {
     }
 
     fetchPost()
-  }, [postId])
+  }, [postId, authFetch])
 
   const handleSave = async (content: string) => {
     if (!post?.id) return
 
     setSaveStatus('saving')
     try {
-      const res = await fetch(`/api/posts/${post.id}`, {
+      const res = await authFetch(`/api/posts/${post.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -148,5 +151,13 @@ export default function PostEditPage() {
       {/* Editor */}
       <PostEditor initialContent={post.content} onSave={handleSave} />
     </div>
+  )
+}
+
+export default function PostEditPage() {
+  return (
+    <AuthGuard>
+      <PostEditContent />
+    </AuthGuard>
   )
 }
