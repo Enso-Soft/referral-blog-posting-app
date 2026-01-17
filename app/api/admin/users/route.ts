@@ -16,26 +16,17 @@ export async function GET(request: NextRequest) {
     const db = getDb()
     const snapshot = await db.collection('users').orderBy('email').get()
 
-    const users = await Promise.all(
-      snapshot.docs.map(async (doc) => {
-        const data = doc.data()
-        // 할당된 제품 수 조회
-        const productsSnapshot = await db
-          .collection('users')
-          .doc(doc.id)
-          .collection('products')
-          .count()
-          .get()
-
-        return {
-          id: doc.id,
-          email: data.email,
-          displayName: data.displayName,
-          role: data.role,
-          assignedProductCount: productsSnapshot.data().count,
-        }
-      })
-    )
+    // 비정규화된 productCount 사용 (N+1 쿼리 방지)
+    const users = snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        email: data.email,
+        displayName: data.displayName,
+        role: data.role,
+        assignedProductCount: data.productCount ?? 0,
+      }
+    })
 
     return NextResponse.json({ success: true, users })
   } catch (error) {

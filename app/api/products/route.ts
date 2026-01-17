@@ -192,43 +192,30 @@ export async function GET(request: NextRequest) {
       totalCount = countSnapshot.data().count
       const totalPages = Math.ceil(totalCount / perPage)
 
-      // 페이지 기반 vs 커서 기반 페이지네이션
-      if (lastId) {
-        // 커서 기반 페이지네이션 (기존 방식)
-        let query = baseQuery
-        if (!minPriceNum && !maxPriceNum) {
-          query = query.orderBy('assignedAt', 'desc')
-        }
-        query = query.limit(perPage)
+      // 커서 기반 페이지네이션 (offset 대신 사용 - 비용 효율적)
+      let query = baseQuery
+      if (!minPriceNum && !maxPriceNum) {
+        query = query.orderBy('assignedAt', 'desc')
+      }
+      query = query.limit(perPage)
 
+      if (lastId) {
         const lastDoc = await productsRef.doc(lastId).get()
         if (lastDoc.exists) {
           query = query.startAfter(lastDoc)
         }
+      }
 
-        const snapshot = await query.get()
-        products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-      } else {
-        // 페이지 기반 페이지네이션
-        let query = baseQuery
-        if (!minPriceNum && !maxPriceNum) {
-          query = query.orderBy('assignedAt', 'desc')
-        }
+      const snapshot = await query.get()
+      products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
-        const offset = (page - 1) * perPage
-        query = query.offset(offset).limit(perPage)
-
-        const snapshot = await query.get()
-        products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-
-        pagination = {
-          currentPage: page,
-          totalPages,
-          perPage,
-          totalCount,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1,
-        }
+      pagination = {
+        currentPage: page,
+        totalPages,
+        perPage,
+        totalCount,
+        hasNextPage: products.length === perPage,
+        hasPrevPage: !!lastId,
       }
     }
 

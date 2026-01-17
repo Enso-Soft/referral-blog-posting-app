@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Timestamp } from 'firebase-admin/firestore'
+import { Timestamp, FieldValue } from 'firebase-admin/firestore'
 import { getDb } from '@/lib/firebase-admin'
 import { getAuthFromRequest } from '@/lib/auth-admin'
 
@@ -146,6 +146,13 @@ export async function POST(request: NextRequest) {
       assignedProducts.push(assignedProductId)
     }
 
+    // 할당된 제품 수만큼 users 문서의 productCount 증가 (비정규화)
+    if (assignedProducts.length > 0) {
+      await db.collection('users').doc(userId).update({
+        productCount: FieldValue.increment(assignedProducts.length),
+      })
+    }
+
     return NextResponse.json({
       success: true,
       assignedCount: assignedProducts.length,
@@ -192,6 +199,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     await batch.commit()
+
+    // 해제된 제품 수만큼 users 문서의 productCount 감소 (비정규화)
+    if (productIds.length > 0) {
+      await db.collection('users').doc(userId).update({
+        productCount: FieldValue.increment(-productIds.length),
+      })
+    }
 
     return NextResponse.json({
       success: true,
