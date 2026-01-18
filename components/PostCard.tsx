@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Clock, FileText, Tag, Send, FileEdit, Loader2, MoreVertical, Calendar } from 'lucide-react'
+import { Clock, FileText, Tag, Send, FileEdit, Loader2, MoreVertical, Calendar, RotateCcw } from 'lucide-react'
 import type { BlogPost } from '@/lib/firestore'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -148,12 +148,12 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
                 ) : status === 'draft' ? (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    <span>발행</span>
+                    <span>발행하기</span>
                   </>
                 ) : (
                   <>
-                    <FileEdit className="w-3.5 h-3.5" />
-                    <span>수정</span>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>초안으로</span>
                   </>
                 )}
               </button>
