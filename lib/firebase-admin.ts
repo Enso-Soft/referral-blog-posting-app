@@ -10,11 +10,6 @@ function initializeFirebaseAdmin() {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   let privateKey = process.env.FIREBASE_PRIVATE_KEY
 
-  // 환경 변수 디버깅
-  console.log('Firebase Admin Init - projectId:', projectId ? 'SET' : 'MISSING')
-  console.log('Firebase Admin Init - clientEmail:', clientEmail ? 'SET' : 'MISSING')
-  console.log('Firebase Admin Init - privateKey:', privateKey ? `SET (length: ${privateKey.length})` : 'MISSING')
-
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(`Firebase Admin 환경 변수가 설정되지 않았습니다. projectId: ${!!projectId}, clientEmail: ${!!clientEmail}, privateKey: ${!!privateKey}`)
   }

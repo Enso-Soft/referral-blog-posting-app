@@ -52,8 +52,3 @@ export function onAuthChange(callback: (user: User | null) => void) {
   return onAuthStateChanged(authInstance, callback)
 }
 
-// 현재 사용자 가져오기
-export function getCurrentUser(): User | null {
-  const authInstance = getAuthInstance()
-  return authInstance.currentUser
-}

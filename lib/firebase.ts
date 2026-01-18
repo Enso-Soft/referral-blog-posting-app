@@ -31,6 +31,3 @@ export function getFirebaseDb(): Firestore {
   return _db
 }
 
-// 기존 코드 호환용 (클라이언트에서만 사용)
-export const app = typeof window !== 'undefined' ? getFirebaseApp() : (null as unknown as FirebaseApp)
-export const db = typeof window !== 'undefined' ? getFirebaseDb() : (null as unknown as Firestore)
