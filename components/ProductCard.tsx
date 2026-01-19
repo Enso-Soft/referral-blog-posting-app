@@ -57,9 +57,9 @@ export function ProductCard({ product }: ProductCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+    <div className="bg-card dark:bg-slate-800 rounded-xl border border-border dark:border-slate-700 overflow-hidden hover:shadow-lg hover:border-indigo-500/50 transition-all duration-300">
       {/* Thumbnail with Slider */}
-      <div className="aspect-square bg-gray-100 relative group">
+      <div className="aspect-square bg-secondary/50 relative group">
         {images.length > 0 ? (
           <img
             src={images[currentImageIndex]}
@@ -67,7 +67,7 @@ export function ProductCard({ product }: ProductCardProps) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300">
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
             <Store className="w-16 h-16" />
           </div>
         )}
@@ -101,9 +101,8 @@ export function ProductCard({ product }: ProductCardProps) {
                   e.stopPropagation()
                   setCurrentImageIndex(idx)
                 }}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  idx === currentImageIndex ? 'bg-white' : 'bg-white/50'
-                }`}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                  }`}
               />
             ))}
           </div>
@@ -132,24 +131,24 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="p-4">
         {/* Brand */}
         {product.brand && (
-          <p className="text-xs text-gray-500 mb-1">{product.brand}</p>
+          <p className="text-xs text-muted-foreground mb-1">{product.brand}</p>
         )}
 
         {/* Name */}
-        <h3 className="font-medium text-gray-900 line-clamp-2 mb-2 min-h-[2.5rem]">
+        <h3 className="font-medium text-foreground line-clamp-2 mb-2 min-h-[2.5rem]">
           {product.name}
         </h3>
 
         {/* Price */}
         {product.price && (
-          <p className="text-lg font-bold text-gray-900 mb-3">
+          <p className="text-lg font-bold text-foreground mb-3">
             {formatPrice(product.price)}
           </p>
         )}
 
         {/* Mall */}
         {product.mall && (
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
             <Store className="w-3 h-3" />
             <span>{product.mall}</span>
           </div>
@@ -168,7 +167,7 @@ export function ProductCard({ product }: ProductCardProps) {
           </a>
           <button
             onClick={handleCopyLink}
-            className="flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="flex items-center justify-center px-3 py-2 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
             title="링크 복사"
           >
             {copied ? (

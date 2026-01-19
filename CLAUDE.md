@@ -23,6 +23,15 @@ npm run lint     # Run ESLint
 npm run start    # Start production server
 ```
 
+### 빌드 시 주의사항
+
+`npm run build`는 `.next` 폴더를 덮어쓰기 때문에 개발 서버와 충돌한다.
+
+**빌드 실행 절차:**
+1. `npm run dev`가 실행 중이면 먼저 종료 (Ctrl+C)
+2. `npm run build` 실행
+3. 빌드 완료 후 `npm run dev`로 개발 서버 재시작
+
 ## Architecture
 
 ### Data Layer

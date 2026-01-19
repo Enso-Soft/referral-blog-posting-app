@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
       ? body.products.filter((p: any) => p.name && p.affiliateLink)
       : []
 
+    // postType 자동 설정 (제품이 있으면 제휴, 없으면 일반)
+    const postType = products.length > 0 ? 'affiliate' : 'general'
+
     // 블로그 포스트 생성
     const docData = {
       userId: user.uid,
@@ -85,6 +88,7 @@ export async function POST(request: NextRequest) {
       content: body.content,
       keywords: Array.isArray(body.keywords) ? body.keywords : [],
       products,
+      postType, // 자동 설정된 타입
       status: body.status === 'published' ? 'published' : 'draft',
       createdAt: now,
       updatedAt: now,
@@ -290,7 +294,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body.products !== undefined && Array.isArray(body.products)) {
-      updateData.products = body.products.filter((p: any) => p.name && p.affiliateLink)
+      const validProducts = body.products.filter((p: any) => p.name && p.affiliateLink)
+      updateData.products = validProducts
+      // 제품 목록이 수정되면 postType도 자동으로 갱신
+      updateData.postType = validProducts.length > 0 ? 'affiliate' : 'general'
     }
 
     if (body.status !== undefined && ['draft', 'published'].includes(body.status)) {

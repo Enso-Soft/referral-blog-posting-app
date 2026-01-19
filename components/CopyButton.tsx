@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Copy, Check } from 'lucide-react'
 
 interface CopyButtonProps {
@@ -10,16 +10,30 @@ interface CopyButtonProps {
 
 export function CopyButton({ content, className = '' }: CopyButtonProps) {
   const [copied, setCopied] = useState(false)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleCopy = async () => {
+  // cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
+
+  const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(content)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      // 이전 타이머 정리
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+      timerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
     }
-  }
+  }, [content])
 
   return (
     <button

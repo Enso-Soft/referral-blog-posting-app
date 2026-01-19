@@ -1,43 +1,52 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Clock, FileText, Tag, Send, FileEdit, Loader2, MoreVertical, Calendar, RotateCcw } from 'lucide-react'
 import type { BlogPost } from '@/lib/firestore'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
+import { getFaviconUrl } from '@/lib/url-utils'
 import { motion } from 'framer-motion'
 
 interface PostCardProps {
   post: BlogPost
   onStatusChange?: (postId: string, newStatus: 'draft' | 'published') => Promise<boolean>
+  onTypeChange?: (postId: string, newType: 'general' | 'affiliate') => Promise<boolean>
 }
 
-export function PostCard({ post, onStatusChange }: PostCardProps) {
+export const PostCard = memo(function PostCard({ post, onStatusChange, onTypeChange }: PostCardProps) {
   const [status, setStatus] = useState(post.status)
-  const [isChanging, setIsChanging] = useState(false)
-  // content에서 첫 번째 이미지 추출
-  const thumbnail = post.content?.match(/<img[^>]+src=["']([^"']+)["']/)?.[1]
+  const [type, setType] = useState<'general' | 'affiliate'>(post.postType || 'general')
+  const [isStatusChanging, setIsStatusChanging] = useState(false)
+  const [isTypeChanging, setIsTypeChanging] = useState(false)
+  const [imageError, setImageError] = useState(false)
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return ''
-    // Firestore Timestamp 형식 처리
-    let date: Date
-    if (timestamp._seconds) {
-      date = new Date(timestamp._seconds * 1000)
-    } else if (typeof timestamp.toDate === 'function') {
-      date = timestamp.toDate()
-    } else {
-      date = new Date(timestamp)
-    }
+  // Sync state with props when data changes externally (real-time)
+  useEffect(() => {
+    setStatus(post.status)
+  }, [post.status])
 
-    if (isNaN(date.getTime())) return ''
+  useEffect(() => {
+    setType(post.postType || 'general')
+  }, [post.postType])
 
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(date)
-  }
+  // Reset image error when thumbnail changes
+  useEffect(() => {
+    setImageError(false)
+  }, [post.content])
+
+  // content에서 첫 번째 이미지 추출 (useMemo로 캐싱)
+  const thumbnail = useMemo(
+    () => post.content?.match(/<img[^>]+src=["']([^"']+)["']/)?.[1],
+    [post.content]
+  )
+
+  // publishedUrl에서 파비콘 URL 생성 (useMemo로 캐싱)
+  const faviconUrl = useMemo(
+    () => (post.publishedUrl ? getFaviconUrl(post.publishedUrl) : null),
+    [post.publishedUrl]
+  )
 
   const handleStatusToggle = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -46,7 +55,7 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
     if (!onStatusChange || !post.id) return
 
     const newStatus = status === 'draft' ? 'published' : 'draft'
-    setIsChanging(true)
+    setIsStatusChanging(true)
 
     try {
       const success = await onStatusChange(post.id, newStatus)
@@ -54,7 +63,26 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
         setStatus(newStatus)
       }
     } finally {
-      setIsChanging(false)
+      setIsStatusChanging(false)
+    }
+  }
+
+  const handleTypeToggle = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!onTypeChange || !post.id) return
+
+    const newType = type === 'general' ? 'affiliate' : 'general'
+    setIsTypeChanging(true)
+
+    try {
+      const success = await onTypeChange(post.id, newType)
+      if (success) {
+        setType(newType)
+      }
+    } finally {
+      setIsTypeChanging(false)
     }
   }
 
@@ -63,11 +91,15 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
       <article className="h-full bg-card hover:bg-card/80 border border-border hover:border-border/80 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 flex flex-col">
         {/* Thumbnail Section */}
         <div className="aspect-[16/9] relative overflow-hidden bg-secondary/50">
-          {thumbnail ? (
-            <img
+          {thumbnail && !imageError ? (
+            <Image
               src={thumbnail}
               alt={post.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              onError={() => setImageError(true)}
+              unoptimized
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
@@ -79,14 +111,42 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
           <div className="absolute top-3 left-3 flex gap-2">
             <span
               className={cn(
-                "px-2.5 py-1 text-xs font-semibold rounded-full backdrop-blur-md shadow-sm border",
+                "px-2.5 py-1 text-xs font-semibold rounded-full backdrop-blur-md shadow-sm border flex items-center gap-1.5",
                 status === 'published'
-                  ? "bg-green-500/10 text-green-600 border-green-200/50 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/20"
-                  : "bg-amber-500/10 text-amber-600 border-amber-200/50 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/20"
+                  ? "bg-green-600 text-white border-green-700 shadow-md"
+                  : "bg-amber-500 text-white border-amber-600 shadow-md"
               )}
             >
+              {status === 'published' && faviconUrl && (
+                <img
+                  src={faviconUrl}
+                  alt=""
+                  className="w-4 h-4 rounded-sm"
+                  onError={(e) => { e.currentTarget.style.display = 'none' }}
+                />
+              )}
               {status === 'published' ? '발행됨' : '초안'}
             </span>
+
+            {/* Type Badge - Clickable */}
+            {onTypeChange && (
+              <button
+                onClick={handleTypeToggle}
+                disabled={isTypeChanging}
+                className={cn(
+                  "px-2.5 py-1 text-xs font-semibold rounded-full backdrop-blur-md shadow-sm border flex items-center gap-1.5 transition-colors",
+                  type === 'affiliate'
+                    ? "bg-indigo-600 text-white border-indigo-700" // 제휴
+                    : "bg-slate-600 text-white border-slate-700"   // 일반
+                )}
+              >
+                {isTypeChanging ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  type === 'affiliate' ? '제휴' : '일반'
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -107,43 +167,26 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
           </div>
 
           {/* Title */}
-          <h3 className="text-lg font-bold text-card-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
+          <h3 className="text-lg font-bold text-card-foreground line-clamp-2 mb-auto group-hover:text-primary transition-colors">
             {post.title || "제목 없음"}
           </h3>
 
-          {/* Excerpt */}
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">
-            {post.content.replace(/<[^>]*>/g, '').slice(0, 120) || "내용 미리보기가 없습니다..."}
-          </p>
-
           {/* Footer Actions */}
-          <div className="pt-4 mt-auto border-t border-border flex items-center justify-between">
-
-            {/* Keywords */}
-            <div className="flex items-center gap-1.5 overflow-hidden">
-              {post.keywords?.slice(0, 2).map((keyword, i) => (
-                <span key={i} className="px-2 py-0.5 text-[10px] font-medium bg-secondary text-secondary-foreground rounded-md">
-                  #{keyword}
-                </span>
-              ))}
-              {post.keywords && post.keywords.length > 2 && (
-                <span className="text-[10px] text-muted-foreground">+{post.keywords.length - 2}</span>
-              )}
-            </div>
-
-            {/* Quick Action */}
-            {onStatusChange && (
+          <div className="pt-4 mt-auto border-t border-border">
+            {/* Single Row with both buttons */}
+            <div className="flex items-center gap-2">
+              {/* Status Toggle Button */}
               <button
                 onClick={handleStatusToggle}
-                disabled={isChanging}
+                disabled={isStatusChanging}
                 className={cn(
-                  "relative z-10 flex items-center gap-1.5 pl-3 text-xs font-medium transition-colors disabled:opacity-50",
+                  "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-all disabled:opacity-50",
                   status === 'draft'
-                    ? "text-primary hover:text-primary/80"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/40"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
                 )}
               >
-                {isChanging ? (
+                {isStatusChanging ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : status === 'draft' ? (
                   <>
@@ -157,10 +200,36 @@ export function PostCard({ post, onStatusChange }: PostCardProps) {
                   </>
                 )}
               </button>
-            )}
+
+              {/* Type Toggle Button */}
+              <button
+                onClick={handleTypeToggle}
+                disabled={isTypeChanging}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-all disabled:opacity-50",
+                  type === 'affiliate'
+                    ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    : "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/40"
+                )}
+              >
+                {isTypeChanging ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : type === 'general' ? (
+                  <>
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>제휴 글로</span>
+                  </>
+                ) : (
+                  <>
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>일반 글로</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </article>
     </Link>
   )
-}
+})

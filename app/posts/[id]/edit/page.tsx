@@ -15,6 +15,7 @@ interface Post {
   title: string
   content: string
   products?: Product[]
+  postType?: 'general' | 'affiliate'
   metadata?: {
     wordCount?: number
     originalPath?: string
@@ -32,6 +33,8 @@ function PostEditContent() {
   const router = useRouter()
   const postId = params.id as string
   const [post, setPost] = useState<Post | null>(null)
+  const [title, setTitle] = useState('')
+  const [postType, setPostType] = useState<'general' | 'affiliate'>('general')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +50,8 @@ function PostEditContent() {
 
         if (data.success) {
           setPost(data.post)
+          setTitle(data.post.title || '')
+          setPostType(data.post.postType || 'general')
           setProducts(data.post.products || [])
         } else {
           setError(data.error || '포스트를 불러올 수 없습니다')
@@ -70,7 +75,9 @@ function PostEditContent() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          title,
           content,
+          postType,
           products,
           metadata: {
             ...post.metadata,
@@ -133,25 +140,55 @@ function PostEditContent() {
           {/* Save Status */}
           {saveStatus !== 'idle' && (
             <span
-              className={`text-sm font-medium ${
-                saveStatus === 'saving'
-                  ? 'text-gray-500'
-                  : saveStatus === 'saved'
+              className={`text-sm font-medium ${saveStatus === 'saving'
+                ? 'text-gray-500'
+                : saveStatus === 'saved'
                   ? 'text-green-600'
                   : 'text-red-600'
-              }`}
+                }`}
             >
               {saveStatus === 'saving'
                 ? '저장 중...'
                 : saveStatus === 'saved'
-                ? '저장됨!'
-                : '저장 실패'}
+                  ? '저장됨!'
+                  : '저장 실패'}
             </span>
           )}
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mt-4">{post.title}</h1>
-        <p className="text-gray-500 mt-1">콘텐츠를 수정합니다</p>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full text-2xl font-bold text-gray-900 dark:text-gray-100 mt-4 bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:outline-none transition-colors pb-1"
+          placeholder="제목을 입력하세요"
+        />
+
+        <div className="flex items-center gap-4 mt-4">
+          <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <button
+              onClick={() => setPostType('general')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${postType === 'general'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
+                }`}
+            >
+              일반 글
+            </button>
+            <button
+              onClick={() => setPostType('affiliate')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${postType === 'affiliate'
+                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
+                }`}
+            >
+              제휴/홍보
+            </button>
+          </div>
+          <p className="text-sm text-gray-500">
+            {postType === 'general' ? '일반적인 블로그 콘텐츠입니다.' : '제품 홍보 및 제휴 링크가 포함된 글입니다.'}
+          </p>
+        </div>
       </div>
 
       {/* Editor */}

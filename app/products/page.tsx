@@ -141,11 +141,11 @@ function ProductList() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">제휴 제품 목록</h1>
-        <p className="text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">제휴 제품 목록</h1>
+        <p className="text-muted-foreground mt-1">
           나에게 할당된 제휴 제품을 확인하고 링크를 복사합니다
           {total !== null && (
-            <span className="ml-2 text-gray-400">
+            <span className="ml-2 text-muted-foreground/80">
               (총 {total.toLocaleString()}개)
             </span>
           )}
@@ -155,25 +155,25 @@ function ProductList() {
       {/* Search */}
       <div className="mb-4">
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
             placeholder="제품명, 브랜드, 스토어 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            className="w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-foreground placeholder:text-muted-foreground"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="w-5 h-5" />
             </button>
           )}
         </div>
         {debouncedSearch && (
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             &quot;{debouncedSearch}&quot; 검색 결과: {filteredProducts.length}개
           </p>
         )}
@@ -184,11 +184,10 @@ function ProductList() {
         <div className="flex gap-2 mb-6 flex-wrap">
           <button
             onClick={() => setCategoryFilter('all')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              categoryFilter === 'all'
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-            }`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${categoryFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border'
+              }`}
           >
             전체 ({total?.toLocaleString() || 0})
           </button>
@@ -196,11 +195,10 @@ function ProductList() {
             <button
               key={cat.name}
               onClick={() => setCategoryFilter(cat.name)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                categoryFilter === cat.name
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${categoryFilter === cat.name
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border'
+                }`}
             >
               {cat.name} ({cat.count.toLocaleString()})
             </button>
@@ -211,8 +209,8 @@ function ProductList() {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-          <span className="ml-2 text-gray-500">로딩 중...</span>
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">로딩 중...</span>
         </div>
       ) : error ? (
         <div className="flex items-center justify-center py-12 text-red-500">
@@ -220,14 +218,14 @@ function ProductList() {
           <span>{error}</span>
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Package className="w-12 h-12 mb-3" />
           <p>
             {debouncedSearch
               ? '검색 결과가 없습니다'
               : categoryFilter === 'all'
-              ? '할당된 제품이 없습니다'
-              : '해당 카테고리에 제품이 없습니다'}
+                ? '할당된 제품이 없습니다'
+                : '해당 카테고리에 제품이 없습니다'}
           </p>
           {!debouncedSearch && categoryFilter === 'all' && (
             <p className="text-sm mt-1">관리자에게 제품 할당을 요청하세요</p>
@@ -244,13 +242,13 @@ function ProductList() {
           {/* Load More Trigger */}
           <div ref={loadMoreRef} className="py-8 flex justify-center">
             {loadingMore && (
-              <div className="flex items-center gap-2 text-gray-500">
+              <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>더 불러오는 중...</span>
               </div>
             )}
             {!hasMore && products.length > 0 && !debouncedSearch && (
-              <p className="text-gray-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 모든 제품을 불러왔습니다 ({products.length}개)
               </p>
             )}

@@ -226,10 +226,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 카테고리 통계 (첫 페이지 + 전체 카테고리 + 필터 없을 때만)
+    // 카테고리 통계 (첫 요청 + 전체 카테고리 + 필터 없을 때만)
+    // lastId가 있으면 페이지네이션 중이므로 통계 조회 불필요
     let categoryStats: { name: string; count: number }[] | undefined
 
-    if (page === 1 && !category && !search && !minPriceNum && !maxPriceNum) {
+    if (!lastId && !category && !search && !minPriceNum && !maxPriceNum) {
       const allUserProductsSnapshot = await productsRef
         .where('userId', '==', auth.userId)
         .select('category.level1')

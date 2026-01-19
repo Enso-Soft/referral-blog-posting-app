@@ -1,8 +1,8 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
 @tailwind base;
 @tailwind components;
-@tailwind utilities;
-
-@layer base {
+@tailwind utilities;@layer base {
   :root {
     /* Premium SaaS Palette - Light Mode */
     --background: 210 40% 98%; /* Slate 50-ish */

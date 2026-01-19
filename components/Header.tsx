@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useAuth } from './AuthProvider'
 import { signOut } from '@/lib/auth'
 import {
@@ -18,25 +18,52 @@ import {
   BookOpen
 } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
-import { cn } from '@/lib/utils'
+import { cn, throttle } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+
+// NavLink를 외부로 분리하여 메모이제이션
+const NavLink = memo(function NavLink({
+  href,
+  icon: Icon,
+  children,
+  active
+}: {
+  href: string
+  icon?: React.ComponentType<{ className?: string }>
+  children: React.ReactNode
+  active?: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
+        active
+          ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-white"
+          : "text-muted-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-secondary/80"
+      )}
+    >
+      {Icon && <Icon className="w-4 h-4" />}
+      <span>{children}</span>
+    </Link>
+  )
+})
 
 export function Header() {
   const { user, userProfile, loading, isAdmin } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [isScrolled, setIsScrolled] = useState(false)
-  const [dateTime, setDateTime] = useState<string | null>(null)
 
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    setDateTime(new Date().toString());
-    const handleScroll = () => {
+    // throttle 적용으로 스크롤 이벤트 최적화 (100ms 간격)
+    const handleScroll = throttle(() => {
       setIsScrolled(window.scrollY > 10)
-    }
-    window.addEventListener('scroll', handleScroll)
+    }, 100)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
@@ -53,21 +80,6 @@ export function Header() {
       console.error('Sign out error:', error)
     }
   }
-
-  const NavLink = ({ href, icon: Icon, children, active }: { href: string; icon?: any; children: React.ReactNode; active?: boolean }) => (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
-        active
-          ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
-          : "text-muted-foreground hover:text-foreground hover:bg-secondary/80"
-      )}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      <span>{children}</span>
-    </Link>
-  )
 
   return (
     <header

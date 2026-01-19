@@ -96,6 +96,7 @@ export function PostEditor({ initialContent, onSave }: PostEditorProps) {
   const originalContent = useRef(initialContent)
   const previewRef = useRef<HTMLDivElement>(null)
   const lastScrolledBlockIndex = useRef<number>(-1)
+  const rafRef = useRef<number | null>(null)
 
   // HTML 블록 매핑 (content가 변경될 때만 재계산)
   const blockMappings = useMemo(() => parseBlockMappings(content), [content])
@@ -152,7 +153,6 @@ export function PostEditor({ initialContent, onSave }: PostEditorProps) {
   )
 
   // 활성 블록 스타일 적용
-  // 활성 블록 스타일 적용
   useEffect(() => {
     if (!previewRef.current || activeBlockIndex < 0) return
 
@@ -190,71 +190,65 @@ export function PostEditor({ initialContent, onSave }: PostEditorProps) {
   )
 
 
-  // 스크롤 동기화
+  // 스크롤 동기화 (requestAnimationFrame 적용)
   const handleEditorScroll = useCallback((scrollPercent: number, firstVisibleLine: number) => {
-    // 1. 퍼센트 기반 스크롤 (백업/기본) - 문서가 너무 짧거나 블록을 못 찾을 때 유용
-    // 하지만 라인 기반이 훨씬 정확하므로 라인 매핑을 우선 시도
-
-    if (!previewRef.current) return
-
-    // 해당 라인에 매핑된 블록 찾기
-    const blockIndex = findBlockIndexByLine(blockMappings, firstVisibleLine)
-
-    if (blockIndex >= 0) {
-      // 블록을 찾았으면 해당 블록으로 스크롤 (debounced version 호출 대신 즉시 계산하여 부드럽게 이동)
-      // 스크롤 이벤트는 빈번하므로 debounce 보다는 requestAnimationFrame 등을 쓰는게 좋지만,
-      // 여기서는 직접 계산해서 scrollTo 호출.
-
-      const previewContainer = previewRef.current.querySelector('.max-w-none')
-      if (!previewContainer) return
-
-      const allBlockElements = previewContainer.querySelectorAll(BLOCK_ELEMENTS.join(','))
-      if (blockIndex < allBlockElements.length) {
-        const targetElement = allBlockElements[blockIndex] as HTMLElement
-        const container = previewRef.current
-
-        // --- Intra-block Interpolation Logic ---
-        // 블록 간 "점프"를 방지하기 위해, 현재 라인이 블록 내에서 어디쯤인지(ratio) 계산
-        const currentBlock = blockMappings[blockIndex]
-        const nextBlock = blockMappings[blockIndex + 1]
-
-        // 현재 블록의 끝 라인 추정 (다음 블록 시작 직전, 혹은 문서 끝)
-        // 다음 블록이 없으면 현재 블록 시작 + 10 (임의)
-        const endLine = nextBlock ? nextBlock.startLine : (currentBlock.startLine + 10)
-
-        // 현재 라인이 블록 내에서 진행된 비율 (0.0 ~ 1.0)
-        const blockHeightLines = Math.max(1, endLine - currentBlock.startLine)
-        const lineOffset = Math.max(0, firstVisibleLine - currentBlock.startLine)
-
-        // 비율 클램핑 (0~1)
-        const ratio = Math.min(1, Math.max(0, lineOffset / blockHeightLines))
-
-        // --- Position Calculation ---
-        // 컨테이너 내부 절대 위치 계산
-        const containerRect = container.getBoundingClientRect()
-        const elementRect = targetElement.getBoundingClientRect()
-
-        // 현재 스크롤 위치 + 뷰포트 상대 위치 = 절대 위치 (컨테이너 기준)
-        const elementTop = elementRect.top - containerRect.top + container.scrollTop
-
-        // 블록의 높이 * 비율 만큼 추가로 스크롤
-        const additionalScroll = targetElement.offsetHeight * ratio
-
-        const finalScrollTop = elementTop + additionalScroll
-
-        // 상단에 여백을 조금 두고 스크롤 (예: 20px)
-        container.scrollTo({
-          top: Math.max(0, finalScrollTop - 20),
-          behavior: 'auto' // 중요: 매 프레임 계산하므로 auto가 가장 부드러움 (smooth는 중첩되어 렉 유발)
-        })
-        return
-      }
+    // 이전 프레임 요청 취소
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
     }
 
-    // 블록을 못 찾은 경우 퍼센트 기반으로 대체 (최상단/최하단 등)
-    const maxScroll = previewRef.current.scrollHeight - previewRef.current.clientHeight
-    previewRef.current.scrollTop = maxScroll * scrollPercent
+    rafRef.current = requestAnimationFrame(() => {
+      if (!previewRef.current) return
+
+      // 해당 라인에 매핑된 블록 찾기
+      const blockIndex = findBlockIndexByLine(blockMappings, firstVisibleLine)
+
+      if (blockIndex >= 0) {
+        const previewContainer = previewRef.current.querySelector('.max-w-none')
+        if (!previewContainer) return
+
+        const allBlockElements = previewContainer.querySelectorAll(BLOCK_ELEMENTS.join(','))
+        if (blockIndex < allBlockElements.length) {
+          const targetElement = allBlockElements[blockIndex] as HTMLElement
+          const container = previewRef.current!
+
+          // --- Intra-block Interpolation Logic ---
+          const currentBlock = blockMappings[blockIndex]
+          const nextBlock = blockMappings[blockIndex + 1]
+          const endLine = nextBlock ? nextBlock.startLine : (currentBlock.startLine + 10)
+          const blockHeightLines = Math.max(1, endLine - currentBlock.startLine)
+          const lineOffset = Math.max(0, firstVisibleLine - currentBlock.startLine)
+          const ratio = Math.min(1, Math.max(0, lineOffset / blockHeightLines))
+
+          // --- Position Calculation ---
+          const containerRect = container.getBoundingClientRect()
+          const elementRect = targetElement.getBoundingClientRect()
+          const elementTop = elementRect.top - containerRect.top + container.scrollTop
+          const additionalScroll = targetElement.offsetHeight * ratio
+          const finalScrollTop = elementTop + additionalScroll
+
+          container.scrollTo({
+            top: Math.max(0, finalScrollTop - 20),
+            behavior: 'auto'
+          })
+          return
+        }
+      }
+
+      // 블록을 못 찾은 경우 퍼센트 기반으로 대체
+      const maxScroll = previewRef.current.scrollHeight - previewRef.current.clientHeight
+      previewRef.current.scrollTop = maxScroll * scrollPercent
+    })
   }, [blockMappings])
+
+  // cleanup RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+      }
+    }
+  }, [])
 
   const handleSave = async () => {
     setSaving(true)

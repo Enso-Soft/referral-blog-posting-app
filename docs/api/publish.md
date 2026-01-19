@@ -38,6 +38,8 @@ Create a new blog post.
 | `keywords` | string[] | No | Keywords array |
 | `status` | string | No | `"draft"` (default) or `"published"` |
 | `products` | object[] | No | Associated products array |
+
+> **Note:** Updating the `products` array will automatically update the `postType`. If `products` becomes non-empty, `postType` changes to 'affiliate'. If empty, it changes to 'general'.
 | `metadata` | object | No | Additional metadata |
 
 **products array element:**
@@ -48,6 +50,8 @@ Create a new blog post.
 | `price` | number | No | Price |
 | `brand` | string | No | Brand |
 
+> **Note:** The `postType` ('general' or 'affiliate') is automatically determined based on the presence of the `products` array. If `products` has items, `postType` becomes 'affiliate', otherwise 'general'.
+
 ### Response
 
 ```json
@@ -57,6 +61,7 @@ Create a new blog post.
     "id": "abc123xyz",
     "title": "Post Title",
     "status": "draft",
+    "postType": "affiliate",
     "createdAt": "2025-01-15T12:00:00.000Z"
   },
   "message": "Blog post created successfully."
@@ -113,6 +118,7 @@ Retrieve posts (single or list).
     "keywords": ["keyword1", "keyword2"],
     "products": [],
     "status": "draft",
+    "postType": "general",
     "createdAt": "2025-01-15T12:00:00.000Z",
     "updatedAt": "2025-01-15T12:00:00.000Z",
     "metadata": {}
@@ -130,6 +136,7 @@ Retrieve posts (single or list).
       "id": "abc123xyz",
       "title": "Post Title",
       "status": "draft",
+      "postType": "general",
       "keywords": ["keyword1"],
       "createdAt": "2025-01-15T12:00:00.000Z",
       "updatedAt": "2025-01-15T12:00:00.000Z"
@@ -183,6 +190,8 @@ Update a post.
 | `status` | string | No | `"draft"` or `"published"` |
 | `products` | object[] | No | Associated products array |
 
+> **Note:** Updating the `products` array will automatically update the `postType`. If `products` becomes non-empty, `postType` changes to 'affiliate'. If empty, it changes to 'general'.
+
 ### Response
 
 ```json
@@ -195,6 +204,7 @@ Update a post.
     "keywords": [],
     "products": [],
     "status": "published",
+    "postType": "general",
     "createdAt": "2025-01-15T12:00:00.000Z",
     "updatedAt": "2025-01-15T13:00:00.000Z"
   },

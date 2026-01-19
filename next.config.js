@@ -6,6 +6,38 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'referral-blog-images.s3.ap-northeast-2.amazonaws.com',
       },
+      {
+        protocol: 'https',
+        hostname: '**.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.imgur.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.tistory.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.naver.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.pstatic.net',
+      },
     ],
   },
   // 서버 사이드 환경 변수를 빌드 시 번들링

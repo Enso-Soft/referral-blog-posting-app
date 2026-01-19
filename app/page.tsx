@@ -1,7 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+// 애니메이션 설정 상수
+const LAYOUT_ANIMATION_THRESHOLD = 12 // 이 개수 이상이면 layout 애니메이션 비활성화
 import { PostCard } from '@/components/PostCard'
 import { AuthGuard } from '@/components/AuthGuard'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
@@ -13,11 +16,24 @@ import Link from 'next/link'
 type StatusFilter = 'all' | 'draft' | 'published'
 
 function PostList() {
-  const [filter, setFilter] = useState<StatusFilter>('all')
-  const { posts, loading, error } = usePosts({ filter })
+  const { posts, loading, error, filter, setFilter, typeFilter, setTypeFilter, scrollPosition, setScrollPosition } = usePosts()
   const { authFetch } = useAuthFetch()
 
-  const handleStatusChange = async (postId: string, newStatus: 'draft' | 'published'): Promise<boolean> => {
+  // Scroll restoration
+  useLayoutEffect(() => {
+    if (!loading && scrollPosition > 0) {
+      window.scrollTo(0, scrollPosition)
+    }
+  }, [loading])
+
+  // Save scroll position on unmount
+  useEffect(() => {
+    return () => {
+      setScrollPosition(window.scrollY)
+    }
+  }, [setScrollPosition])
+
+  const handleStatusChange = useCallback(async (postId: string, newStatus: 'draft' | 'published'): Promise<boolean> => {
     try {
       const res = await authFetch(`/api/posts/${postId}`, {
         method: 'PATCH',
@@ -29,7 +45,21 @@ function PostList() {
     } catch {
       return false
     }
-  }
+  }, [authFetch])
+
+  const handleTypeChange = useCallback(async (postId: string, newType: 'general' | 'affiliate'): Promise<boolean> => {
+    try {
+      const res = await authFetch(`/api/posts/${postId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postType: newType }),
+      })
+      const data = await res.json()
+      return data.success
+    } catch {
+      return false
+    }
+  }, [authFetch])
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -40,22 +70,43 @@ function PostList() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-secondary/50 rounded-xl w-fit">
-        {(['all', 'draft', 'published'] as const).map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={cn(
-              "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 capitalize",
-              filter === status
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-            )}
-          >
-            {status === 'all' ? '전체' : status === 'draft' ? '초안' : '발행됨'}
-          </button>
-        ))}
+      {/* Filters Container */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Type Filter */}
+        <div className="flex items-center gap-2 p-1 bg-secondary/50 rounded-xl w-fit">
+          {(['all', 'general', 'affiliate'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setTypeFilter(type)}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 capitalize",
+                typeFilter === type
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              )}
+            >
+              {type === 'all' ? '전체 글' : type === 'general' ? '일반' : '제휴'}
+            </button>
+          ))}
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-2 p-1 bg-secondary/50 rounded-xl w-fit">
+          {(['all', 'draft', 'published'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 capitalize",
+                filter === status
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              )}
+            >
+              {status === 'all' ? '전체 상태' : status === 'draft' ? '초안' : '발행됨'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
@@ -96,13 +147,17 @@ function PostList() {
               {posts.map((post) => (
                 <motion.div
                   key={post.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 25 }}
+                  layout={posts.length < LAYOUT_ANIMATION_THRESHOLD}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <PostCard post={post} onStatusChange={handleStatusChange} />
+                  <PostCard
+                    post={post}
+                    onStatusChange={handleStatusChange}
+                    onTypeChange={handleTypeChange}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>
