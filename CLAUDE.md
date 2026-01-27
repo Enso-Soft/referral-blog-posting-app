@@ -86,23 +86,7 @@ interface BlogPost {
 
 ## Environment Variables
 
-Required `NEXT_PUBLIC_*` Firebase config variables:
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-
-Server-side environment variables:
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_PRIVATE_KEY`
-- `S3_ACCESS_KEY_ID`
-- `S3_SECRET_ACCESS_KEY`
-- `S3_REGION`
-- `S3_BUCKET`
-- `AI_API_KEY`
+환경변수는 `.env.local` 파일 참고.
 
 ### Amplify 배포 시 환경변수 주의사항
 
